@@ -1,6 +1,6 @@
 # kamasu
 
-HTTP Proxy Sever for PHP Build-in Server, written in Rust.
+HTTP Proxy Sever for PHP Built-in Server, written in Rust.
 
 ## Installation
 
