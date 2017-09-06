@@ -45,6 +45,7 @@ fn spawn_php_server_process(opts: &PHPSpawnOption, n: usize, procs: &mut Vec<(Ch
 fn main() {
     let app = App::new(APP_NAME)
         .version(VERSION)
+        .about("Reverse Proxy for PHP built-in Server")
         .arg(Arg::with_name("server")
              .short("S")
              .takes_value(true)
