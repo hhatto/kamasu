@@ -17,8 +17,8 @@ use clap::{App, Arg};
 mod proxy;
 
 const BASE_PORT: i32 = 60000;
-const APP_NAME: &'static str = "boostphpserver";
-const VERSION: &'static str = "0.1";
+const APP_NAME: &'static str = "kamasu";
+const VERSION: &'static str = "0.1.1";
 
 struct PHPSpawnOption {
     host: String,
