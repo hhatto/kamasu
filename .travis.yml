@@ -64,7 +64,7 @@ deploy:
   provider: releases
   api_key:
     secure: bIPGui5pQ2kbpTBUhznaAqNqa26xMYwUi2/bc30tMBwDUz0htAP6vrEnX80TM5OrwVuD42pz8w8nzC7J+8btzSECjBzK2l7e4QSIki9875doLpOHjJDi1vdOs4htaXmVOal0E3Gkwjrxtzk+HOGJOFVXtnU2gMM4YnSlOrQAlGFP3Fb4zP0pImLLBvWu/jyXoD/rr5Z6/5Y4CyegjBHJozJGwkoJGx6NOdHIPruw95NH6eqzMMgvZE0NQndyN7AkdVNI4thXfTSOwA6oAh6LtMX9JIvfj9xMSvttzZOReVM46TDexKs6mVfbvemqfhLlw+MKqjHeyDL5gW8tcd6ODjtDtCrv7kJ4rJ0omn+2r8Wv0hP+6iJUSIXxbgstxbYIKFGUT/nJ5A8mM3Iz6xBvOvxXza6iM9F8SyMIIhbsyEP3ngZcI69PGLrNES0qDldIDt6R9BJJp41XPmODL0bHbHN5BXNzX58eqf3qQaft317mCNjIh0dI8pM1/3/XtYbgiagKJ2Xued9ZS/ZX9HJMUZlOLiyIucKWPcpEHBLMpqJMp9f3Fk98oFpxm/NKNNrZkrEELDtVZu4zf2osJnj4ZKGPg8lc+zabAGVHT+FhdPjsb4rdE4IhG037ksFJOli1xd72kPX0kNpGQz5p2gkhvJthUecCXAfxhjnU3KPq7kM=
-  file: kamasu-${TRAVIS_TAG}-${TARGET}.gz
+  file: kamasu-${TRAVIS_TAG}-${TARGET}.zip
   skip_cleanup: true
   on:
     repo: hhatto/kamasu
