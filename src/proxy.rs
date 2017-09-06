@@ -3,7 +3,7 @@ use futures;
 use futures::Future;
 use hyper::{Client, StatusCode, Body};
 use hyper::client::HttpConnector;
-use hyper::server::{Service, Request, Response};
+use hyper::server::{self, Service, Request, Response};
 
 pub struct Proxy {
     pub routes: Vec<String>,
@@ -16,20 +16,28 @@ impl Service for Proxy {
     type Error = hyper::Error;
     type Future = Box<Future<Item=Response, Error=Self::Error>>;
 
-    fn call(&self, req: Request) -> Self::Future {
-        let l = self.routes.len();
-        let uri = req.uri();
+    fn call(&self, req: server::Request) -> Self::Future {
+        let uri = req.uri().clone();
         let fut = {
+            // load blancing, port-hash now
             let index = if let Some(addr) = req.remote_addr() {
-                addr.port() % (l as u16)
+                addr.port() % (self.routes.len() as u16)
             } else {
                 0
             } as usize;
             let backend_addr = self.routes[index].clone();
-            let url = format!("http://{}{}", backend_addr, uri.path())
-                .parse::<hyper::Uri>().expect("uri error");
+
+            // create request
+            let url_str = match uri.query() {
+                Some(query) => format!("http://{}{}?{}", backend_addr, uri.path(), query),
+                None => format!("http://{}{}", backend_addr, uri.path()),
+            };
+            let url = url_str.parse::<hyper::Uri>().expect("uri error");
             let mut proxied_req = hyper::client::Request::new(req.method().clone(), url);
             *proxied_req.headers_mut() = req.headers().clone();
+            proxied_req.set_body(req.body());
+
+            // request to backend server
             let req = self.client.request(proxied_req);
             Box::new(req.then(|res| {
                 if let Ok(res) = res {
