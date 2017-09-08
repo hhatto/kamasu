@@ -1,8 +1,6 @@
 language: rust
 dist: trusty
 
-env:
-
 matrix:
   include:
     - os: osx
