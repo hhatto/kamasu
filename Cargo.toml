@@ -6,6 +6,9 @@ authors = ["Hideo Hattori <hhatto.jp@gmail.com>"]
 [dependencies]
 tokio-core = "0.1"
 tokio-io = "0.1"
+tokio-tls = "0.1"
+#tokio-service = "0.1"
+native-tls = "0.1"
 futures = "0.1"
 clap = "2"
 hyper = { "git" = "https://github.com/hyperium/hyper.git" }

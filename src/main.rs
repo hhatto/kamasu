@@ -1,6 +1,8 @@
 extern crate hyper;
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_tls;
+extern crate native_tls;
 extern crate clap;
 
 use std::process::Child;
@@ -12,6 +14,9 @@ use hyper::server::Http;
 
 use tokio_core::reactor::Core;
 use tokio_core::net::TcpListener;
+use tokio_tls::TlsAcceptorExt;
+use native_tls::{Pkcs12, TlsAcceptor};
+
 use clap::{App, Arg};
 
 mod proxy;
@@ -42,6 +47,48 @@ fn spawn_php_server_process(opts: &PHPSpawnOption, n: usize, procs: &mut Vec<(Ch
     }
 }
 
+fn spawn_proxy(routes: Vec<String>, addr_str: String, https_acceptor: Option<TlsAcceptor>) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let mut core = Core::new().unwrap();
+        let handle = core.handle();
+        let http = Http::new();
+        let backend_client = hyper::Client::new(&handle);
+
+        let addr = addr_str.as_str().parse().unwrap();
+        let sock = TcpListener::bind(&addr, &handle)
+            .expect(format!("bind error. addr={}", addr).as_str());
+        let host = format!("{}", sock.local_addr().unwrap().ip());
+        let port = sock.local_addr().unwrap().port();
+
+        if let Some(https_acceptor) = https_acceptor {
+            println!("Listening on {}:{} with https", host, port);
+            let server = sock.incoming().for_each(|(client, client_addr)| {
+                let service = proxy::Proxy {
+                    routes: routes.clone(),
+                    client: backend_client.clone(),
+                };
+                https_acceptor.accept_async(client).join(Ok(client_addr)).and_then(|(stream, client_addr)| {
+                    http.bind_connection(&handle, stream, client_addr, service);
+                    Ok(())
+                }).or_else(|e| { println!("error accepting TLS connection: {}", e); Ok(()) })
+            });
+            core.run(server).unwrap();
+        } else {
+            println!("Listening on {}:{}", host, port);
+            let server = sock.incoming().for_each(|(client, client_addr)| {
+                let service = proxy::Proxy {
+                    routes: routes.clone(),
+                    client: backend_client.clone(),
+                };
+                futures::future::ok(client_addr).and_then(|client_addr| {
+                    http.bind_connection(&handle, client, client_addr, service);
+                    Ok(())
+                })
+            });
+            core.run(server).unwrap();
+        };
+    })
+}
 fn main() {
     let app = App::new(APP_NAME)
         .version(VERSION)
@@ -50,7 +97,13 @@ fn main() {
              .short("S")
              .takes_value(true)
              .value_name("ADDR")
-             .help("Run with web server"))
+             .help("Run with HTTP Web Server"))
+        .arg(Arg::with_name("https")
+             .short("s")
+             .long("https")
+             .takes_value(true)
+             .value_name("ADDR")
+             .help("Run with HTTPS Web Server"))
         .arg(Arg::with_name("procs")
              .short("n")
              .takes_value(true)
@@ -71,8 +124,8 @@ fn main() {
 
     // bind address
     let addr_str = match matches.value_of("server") {
-        Some(v) => v,
-        None => "127.0.0.1:8000",
+        Some(v) => v.to_string(),
+        None => "127.0.0.1:8000".to_string(),
     };
 
     // PHP docroot
@@ -98,41 +151,31 @@ fn main() {
         None => 10,
     };
 
+    // spawn php server processes
     let mut procs = vec![];
-    let mut core = Core::new().unwrap();
-    let http = Http::new();
-    let handle = core.handle();
-    let backend_client = hyper::Client::new(&handle);
-
-    let addr = addr_str.parse().unwrap();
-    let sock = TcpListener::bind(&addr, &handle)
-        .expect(format!("bind error. addr={}", addr).as_str());
-    let host = format!("{}", sock.local_addr().unwrap().ip());
-    let port = sock.local_addr().unwrap().port();
-
-    println!("Listening on {}:{}", host, port);
-
     let phpopts = PHPSpawnOption {
-        host: host,
+        host: "127.0.0.1".to_string(),
         phpini: phpini.to_string(),
         docroot: docroot.to_string(),
     };
-
     spawn_php_server_process(&phpopts, proc_num, &mut procs);
 
     let routes: Vec<String> = procs.iter().map(|p| p.1.clone()).collect();
-    let server = sock.incoming().for_each(|(client, client_addr)| {
-        let service = proxy::Proxy {
-            routes: routes.clone(),
-            client: backend_client.clone()
-        };
-        futures::future::ok(client_addr).and_then(|client_addr| {
-            http.bind_connection(&handle, client, client_addr, service);
-            Ok(())
-        })
-    });
 
-    core.run(server).unwrap();
+    let mut proxy_procs = vec![];
+    proxy_procs.push(spawn_proxy(routes.clone(), addr_str, None));
+
+    // use HTTPS
+    match matches.value_of("https") {
+        Some(addr) => {
+            let der = include_bytes!("kamasu.p12");
+            let cert = Pkcs12::from_der(der, APP_NAME).unwrap();
+            proxy_procs.push(
+                spawn_proxy(routes, addr.to_string(),
+                Some(TlsAcceptor::builder(cert).unwrap().build().unwrap())));
+        },
+        None => {},
+    };
 
     loop {
         for p in procs.iter_mut() {
