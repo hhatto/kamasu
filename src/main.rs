@@ -4,11 +4,12 @@ extern crate tokio_core;
 extern crate tokio_tls;
 extern crate native_tls;
 extern crate clap;
+extern crate tls_api_openssl;
+extern crate tls_api;
 
-use std::process::Child;
 use std::thread::sleep;
 use std::time::Duration;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use futures::{Stream, Future};
 use hyper::server::Http;
 
@@ -16,10 +17,13 @@ use tokio_core::reactor::Core;
 use tokio_core::net::TcpListener;
 use tokio_tls::TlsAcceptorExt;
 use native_tls::{Pkcs12, TlsAcceptor};
+use tls_api_openssl::TlsAcceptorBuilder;
+use tls_api::TlsAcceptorBuilder as tls_api_TlsAcceptorBuilder;
 
 use clap::{App, Arg};
 
 mod proxy;
+mod http2;
 
 const BASE_PORT: i32 = 60000;
 const APP_NAME: &'static str = "kamasu";
@@ -89,6 +93,7 @@ fn spawn_proxy(routes: Vec<String>, addr_str: String, https_acceptor: Option<Tls
         };
     })
 }
+
 fn main() {
     let app = App::new(APP_NAME)
         .version(VERSION)
@@ -104,6 +109,12 @@ fn main() {
              .takes_value(true)
              .value_name("ADDR")
              .help("Run with HTTPS Web Server"))
+        .arg(Arg::with_name("http2")
+             .short("h2")
+             .long("http2")
+             .takes_value(true)
+             .value_name("ADDR")
+             .help("Run with HTTP2 Web Server"))
         .arg(Arg::with_name("procs")
              .short("n")
              .takes_value(true)
@@ -171,8 +182,22 @@ fn main() {
             let der = include_bytes!("kamasu.p12");
             let cert = Pkcs12::from_der(der, APP_NAME).unwrap();
             proxy_procs.push(
-                spawn_proxy(routes, addr.to_string(),
+                spawn_proxy(routes.clone(), addr.to_string(),
                 Some(TlsAcceptor::builder(cert).unwrap().build().unwrap())));
+        },
+        None => {},
+    };
+
+    // use HTTP2
+    match matches.value_of("http2") {
+        Some(addr) => {
+            let der = include_bytes!("kamasu.p12");
+            let mut tls_acceptor = TlsAcceptorBuilder::from_pkcs12(der, APP_NAME).expect("acceptor build error");
+            tls_acceptor.set_alpn_protocols(&[b"h2"]).expect("set_alpn_protocols error");
+
+            proxy_procs.push(http2::spawn_proxy(
+                    routes, addr.to_string(),
+                    tls_acceptor.build().expect("tls acceptor build error")));
         },
         None => {},
     };
