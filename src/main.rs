@@ -27,7 +27,7 @@ mod http2;
 
 const BASE_PORT: i32 = 60000;
 const APP_NAME: &'static str = "kamasu";
-const VERSION: &'static str = "0.1.2";
+const VERSION: &'static str = "0.2.0";
 
 struct PHPSpawnOption {
     host: String,
