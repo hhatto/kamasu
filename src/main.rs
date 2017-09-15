@@ -25,9 +25,9 @@ use clap::{App, Arg};
 mod proxy;
 mod http2;
 
+const APP_NAME: &'static str = env!("CARGO_PKG_NAME");
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const BASE_PORT: i32 = 60000;
-const APP_NAME: &'static str = "kamasu";
-const VERSION: &'static str = "0.2.0";
 
 struct PHPSpawnOption {
     host: String,
