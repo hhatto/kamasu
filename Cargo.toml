@@ -12,5 +12,6 @@ tls-api = "0.1"
 tls-api-openssl = "0.1.9"
 futures = "0.1"
 httpbis = "0.4.1"
+regex = "0.2"
 clap = "2"
 hyper = { "git" = "https://github.com/hyperium/hyper.git" }

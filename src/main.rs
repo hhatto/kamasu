@@ -1,3 +1,4 @@
+extern crate regex;
 extern crate hyper;
 extern crate futures;
 extern crate tokio_core;
@@ -10,6 +11,7 @@ extern crate tls_api;
 use std::thread::sleep;
 use std::time::Duration;
 use std::process::{Child, Command, Stdio};
+use regex::Regex;
 use futures::{Stream, Future};
 use hyper::server::Http;
 
@@ -35,6 +37,12 @@ struct PHPSpawnOption {
     phpini: String,
 }
 
+#[derive(Clone, Debug)]
+struct ProxyOption {
+    routes: Vec<String>,
+    docroot: String,
+    static_route: Option<Regex>,
+}
 
 fn spawn_php_server_process(opts: &PHPSpawnOption, n: usize, procs: &mut Vec<(Child, String)>) {
     for port_offset in 0..n {
@@ -51,7 +59,7 @@ fn spawn_php_server_process(opts: &PHPSpawnOption, n: usize, procs: &mut Vec<(Ch
     }
 }
 
-fn spawn_proxy(routes: Vec<String>, addr_str: String, https_acceptor: Option<TlsAcceptor>) -> std::thread::JoinHandle<()> {
+fn spawn_proxy(opt: ProxyOption, addr_str: String, https_acceptor: Option<TlsAcceptor>) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut core = Core::new().unwrap();
         let handle = core.handle();
@@ -68,8 +76,10 @@ fn spawn_proxy(routes: Vec<String>, addr_str: String, https_acceptor: Option<Tls
             println!("Listening on {}:{} with https", host, port);
             let server = sock.incoming().for_each(|(client, client_addr)| {
                 let service = proxy::Proxy {
-                    routes: routes.clone(),
+                    routes: opt.routes.clone(),
                     client: backend_client.clone(),
+                    docroot: opt.docroot.clone(),
+                    static_content_target: opt.static_route.clone(),
                 };
                 https_acceptor.accept_async(client).join(Ok(client_addr)).and_then(|(stream, client_addr)| {
                     http.bind_connection(&handle, stream, client_addr, service);
@@ -81,8 +91,10 @@ fn spawn_proxy(routes: Vec<String>, addr_str: String, https_acceptor: Option<Tls
             println!("Listening on {}:{}", host, port);
             let server = sock.incoming().for_each(|(client, client_addr)| {
                 let service = proxy::Proxy {
-                    routes: routes.clone(),
+                    routes: opt.routes.clone(),
                     client: backend_client.clone(),
+                    docroot: opt.docroot.clone(),
+                    static_content_target: opt.static_route.clone(),
                 };
                 futures::future::ok(client_addr).and_then(|client_addr| {
                     http.bind_connection(&handle, client, client_addr, service);
@@ -120,6 +132,12 @@ fn main() {
              .takes_value(true)
              .value_name("PROCS")
              .help("Spawn N php procs"))
+        .arg(Arg::with_name("staticroute")
+             .short("r")
+             .long("static-content-route")
+             .takes_value(true)
+             .value_name("REGEX")
+             .help("Specify static content routing"))
         .arg(Arg::with_name("phpini")
              .short("c")
              .takes_value(true)
@@ -162,6 +180,12 @@ fn main() {
         None => 10,
     };
 
+    // routing static content
+    let re_staticroute: Option<Regex> = match matches.value_of("staticroute") {
+        Some(v) => Some(Regex::new(v).expect("regex compile error")),
+        None => None,
+    };
+
     // spawn php server processes
     let mut procs = vec![];
     let phpopts = PHPSpawnOption {
@@ -174,7 +198,12 @@ fn main() {
     let routes: Vec<String> = procs.iter().map(|p| p.1.clone()).collect();
 
     let mut proxy_procs = vec![];
-    proxy_procs.push(spawn_proxy(routes.clone(), addr_str, None));
+    let proxy_option = ProxyOption {
+        routes: routes.clone(),
+        static_route: re_staticroute.clone(),
+        docroot: docroot.to_string(),
+    };
+    proxy_procs.push(spawn_proxy(proxy_option.clone(), addr_str, None));
 
     // use HTTPS
     match matches.value_of("https") {
@@ -182,7 +211,7 @@ fn main() {
             let der = include_bytes!("kamasu.p12");
             let cert = Pkcs12::from_der(der, APP_NAME).unwrap();
             proxy_procs.push(
-                spawn_proxy(routes.clone(), addr.to_string(),
+                spawn_proxy(proxy_option, addr.to_string(),
                 Some(TlsAcceptor::builder(cert).unwrap().build().unwrap())));
         },
         None => {},
