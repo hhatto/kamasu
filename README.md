@@ -7,7 +7,7 @@ HTTP Proxy Sever for PHP Built-in Server, written in Rust.
         |  kamasu(main proc)  | - - - - |                                        |-+
         |                     |  +----> |           php built-in server          | |-+
   HTTP  |    +--------+  HTTP |  |+---> | (child proc via std::process::Command) | | |
- ----------->| thread |----------+|+--> |                                        | | |
+ ----------->| thread |----------+|     |                                        | | |
         |    | (http) |       |   |     +----------------------------------------+ | |
         |    +---------       |   |       +----------------------------------------+ |
         |                     |   |         +----------------------------------------+
