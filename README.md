@@ -1,4 +1,4 @@
-# kamasu [![](https://travis-ci.org/hhatto/kamasu.svg?branch=master)](https://travis-ci.org/hhatto/kamasu)
+# kamasu [![build](https://github.com/hhatto/kamasu/actions/workflows/rust.yml/badge.svg)](https://github.com/hhatto/kamasu/actions/workflows/rust.yml)
 
 HTTP Proxy Sever for PHP Built-in Server, written in Rust.
 
