@@ -8,18 +8,14 @@ HTTP Proxy Sever for PHP Built-in Server, written in Rust.
         |                     |  +----> |           php built-in server          | |-+
   HTTP  |    +--------+  HTTP |  |+---> | (child proc via std::process::Command) | | |
  ----------->| thread |----------+|+--> |                                        | | |
-        |    | (http) |       |   ||    +----------------------------------------+ | |
-        |    +---------       |   ||      +----------------------------------------+ |
-        |                     |   ||        +----------------------------------------+
-  HTTPS |    +--------+  HTTP |   ||                        :
- ----------->| thread |-----------+|                        : N procs
-        |    | (https)|       |    |                        :
-        |    +--------+       |    |
-        |                     |    |
-  HTTP2 |    +--------+  HTTP |    |
- ----------->| thread |------------+
-        |    | (http2)|       |
+        |    | (http) |       |   |     +----------------------------------------+ | |
+        |    +---------       |   |       +----------------------------------------+ |
+        |                     |   |         +----------------------------------------+
+  H2/HTTPS   +--------+  HTTP |   |                         :
+ ----------->| thread |-----------+                         : N procs
+        |    | (https)|       |                             :
         |    +--------+       |
+        |                     |
         +---------------------+
 ```
 
@@ -31,8 +27,14 @@ $ cargo install --git https://github.com/hhatto/kamasu.git
 
 ## Usage
 
+with HTTP:
 ```
-$ kamasu -S 127.0.0.1:8080 -n 4 -t ./your/docroot -c php.ini
+$ kamasu -S 127.0.0.1:8080 -n 4 -t /your/docroot -c php.ini
+```
+
+with H2(HTTPS):
+```
+$ kamasu --https 127.0.0.1:8443 -n 4 -t /your/docroot -c php.ini
 ```
 
 ## License
